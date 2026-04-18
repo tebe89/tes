@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, height=768">
+    <title>SuaraKita - Text to Speech</title>
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at 0% 0%, #4f46e5 0%, transparent 50%),
+                           radial-gradient(circle at 100% 0%, #ec4899 0%, transparent 50%),
+                           radial-gradient(circle at 100% 100%, #8b5cf6 0%, transparent 50%),
+                           radial-gradient(circle at 0% 100%, #06b6d4 0%, transparent 50%);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-main: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.7);
+            --accent: #ffffff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: #0f172a; background-image: var(--bg-gradient); height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--text-main); }
+        .app-container { width: 900px; height: 640px; background: var(--glass-bg); backdrop-filter: blur(24px); border: 1px solid var(--glass-border); border-radius: 32px; display: grid; grid-template-columns: 280px 1fr; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .sidebar { background: rgba(0, 0, 0, 0.2); border-right: 1px solid var(--glass-border); padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+        .logo { font-size: 24px; font-weight: 800; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; }
+        .setting-group { display: flex; flex-direction: column; gap: 8px; }
+        .setting-label { font-size: 12px; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+        .select-input { background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-border); padding: 12px; border-radius: 12px; color: white; font-size: 14px; outline: none;}
+        .select-input option { color: black; }
+        .main-content { padding: 40px; display: flex; flex-direction: column; gap: 24px; }
+        .text-area-container { flex-grow: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; }
+        .text-input { width: 100%; height: 100%; background: transparent; border: none; color: white; font-size: 18px; line-height: 1.6; resize: none; outline: none; }
+        .char-count { align-self: flex-end; font-size: 12px; color: var(--text-dim); margin-top: 12px; }
+        .actions { display: flex; gap: 16px; justify-content: flex-end; align-items: center; }
+        .btn { padding: 14px 28px; border-radius: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border: none; transition: 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: white; color: #0f172a; }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); color: white; border: 1px solid var(--glass-border); }
+        .status-pill { background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 4px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; margin-bottom: 8px; align-self: flex-start;}
+        audio { height: 40px; margin-right: auto; filter: invert(1); border-radius: 8px; display: none; outline: none; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <svg class="logo-icon" fill="none" stroke="#0f172a" viewBox="0 0 24 24" style="padding: 4px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                SuaraKita
+            </div>
+
+            <div class="setting-group">
+                <span class="setting-label">Pilih Suara CGI</span>
+                <select id="voice-select" class="select-input">
+                    <option value="Kore">Kore (Standar)</option>
+                    <option value="Puck">Puck</option>
+                    <option value="Charon">Charon</option>
+                    <option value="Fenrir">Fenrir</option>
+                    <option value="Zephyr">Zephyr</option>
+                </select>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <span class="setting-label" style="display:block; margin-bottom: 8px;">Informasi Sistem</span>
+                <div style="font-size: 13px; color: var(--text-dim); line-height: 1.5;">API: Gemini Flash TTS<br>Format: WAV (16-bit PCM)<br>HTML Standalone</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header style="display: flex; flex-direction: column;">
+                <div id="status-pill" class="status-pill">Sistem Siap</div>
+                <h1 style="font-size: 32px; font-weight: 700;">Konversi Teks ke Suara</h1>
+                <p style="color: var(--text-dim); margin-top: 4px;">Tulis teks Anda di bawah dan dengarkan hasilnya secara instan.</p>
+            </header>
+
+            <div class="text-area-container">
+                <textarea id="text-input" class="text-input" placeholder="Ketik atau tempel teks Anda di sini..." maxlength="1000"></textarea>
+                <span id="char-count" class="char-count">0 / 1000 Karakter</span>
+            </div>
+
+            <div class="actions">
+                <audio id="audio-player" controls autoplay></audio>
+                <button id="download-btn" class="btn btn-secondary" style="display: none;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Unduh WAV
+                </button>
+                <button id="play-btn" class="btn btn-primary" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Buat Suara
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- SCRIPT LOGIKA UTAMA HARAP JANGAN DIUBAH KECUALI API KEY -->
+    <script type="module">
+        // -------------------------------------------------------------------------
+        // PERHATIAN BILA DIPASANG DI GITHUB PAGES!!!
+        // Ganti baris di bawah ini dengan menyalin API Key milik Anda!
+        // Contoh yang benar: const USER_API_KEY = "AIzaSyDa....XyZ";
+        // -------------------------------------------------------------------------
+        const USER_API_KEY = "TARUH_API_KEY_ANDA_DISINI"; // <-- ISI API KEY ANDA DISINI
+
+        const textInput = document.getElementById('text-input');
+        const voiceSelect = document.getElementById('voice-select');
+        const playBtn = document.getElementById('play-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const audioPlayer = document.getElementById('audio-player');
+        const charCount = document.getElementById('char-count');
+        const statusPill = document.getElementById('status-pill');
+
+        let currentAudioUrl = null;
+
+        textInput.addEventListener('input', () => {
+            const length = textInput.value.length;
+            charCount.innerText = `${length} / 1000 Karakter`;
+            if(length > 0) {
+                playBtn.disabled = false;
+            } else {
+                playBtn.disabled = true;
+            }
+        });
+
+        playBtn.addEventListener('click', async () => {
+            if (!USER_API_KEY || USER_API_KEY === "TARUH_API_KEY_ANDA_DISINI") {
+                alert("Silakan buka file index.html menggunakan aplikasi Teks Editor, lalu cari baris 'TARUH_API_KEY_ANDA_DISINI' dan isikan Kunci API Gemini milik Anda.");
+                return;
+            }
+
+            const text = textInput.value.trim();
+            if (!text) return;
+
+            playBtn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Memproses';
+            playBtn.disabled = true;
+            statusPill.innerText = "Menghasilkan Suara...";
+            statusPill.style.color = "#fbbf24";
+            statusPill.style.background = "rgba(251, 191, 36, 0.2)";
+            downloadBtn.style.display = "none";
+            audioPlayer.style.display = "none";
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-tts-preview:generateContent?key=${USER_API_KEY}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: text }] }],
+                    config: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: voiceSelect.value }
+                            }
+                        }
+                    }
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errInfo = await response.json();
+                    throw new Error(errInfo.error?.message || "Kesalahan dari Server API Google Gemini");
+                }
+
+                const data = await response.json();
+                const base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                
+                if (!base64Audio) throw new Error("Suara gagal dibuat.");
+
+                const binaryString = atob(base64Audio);
+                const pcmBytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    pcmBytes[i] = binaryString.charCodeAt(i);
+                }
+
+                const dataLength = pcmBytes.length;
+                const sampleRate = 24000;
+                const numChannels = 1; 
+                const bitsPerSample = 16;
+                const blockAlign = (numChannels * bitsPerSample) / 8;
+                const byteRate = sampleRate * blockAlign;
+                
+                const buffer = new ArrayBuffer(44 + dataLength);
+                const view = new DataView(buffer);
+
+                const writeString = (offset, str) => {
+                    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+                };
+
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + dataLength, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true); 
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, byteRate, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, bitsPerSample, true);
+                writeString(36, 'data');
+                view.setUint32(40, dataLength, true);
+
+                const wavBytes = new Uint8Array(buffer);
+                wavBytes.set(pcmBytes, 44);
+                const blob = new Blob([wavBytes], { type: 'audio/wav' });
+                
+                if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); 
+                currentAudioUrl = URL.createObjectURL(blob);
+
+                audioPlayer.src = currentAudioUrl;
+                audioPlayer.style.display = "block";
+                
+                downloadBtn.style.display = "flex";
+                
+                statusPill.innerText = "Tugas Selesai";
+                statusPill.style.color = "#4ade80";
+                statusPill.style.background = "rgba(34, 197, 94, 0.2)";
+
+            } catch (err) {
+                alert("Pesan Eror: " + err.message);
+                statusPill.innerText = "Sistem Eror!";
+                statusPill.style.color = "#f87171";
+                statusPill.style.background = "rgba(248, 113, 113, 0.2)";
+            } finally {
+                playBtn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Buat Suara';
+                playBtn.disabled = false;
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!currentAudioUrl) return;
+            const a = document.createElement('a');
+            a.href = currentAudioUrl;
+            a.download = `Suara_${voiceSelect.value}_${Date.now()}.wav`;
+            a.click();
+        });
+    </script>
+</body>
+</html>
